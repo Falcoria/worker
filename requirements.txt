@@ -1,0 +1,6 @@
+pydantic-settings
+redis
+urllib3
+requests
+celery
+python-libnmap
