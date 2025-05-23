@@ -27,7 +27,7 @@ class Config(BaseSettings):
     nmap_service_opts: str = "-sV -Pn -T4"
 
     logger_name: str = "worker_logger"
-    logger_level: str = "DEBUG"
+    logger_level: str = "INFO"
 
     backend_base_url: str = "http://localhost:8000"
     worker_backend_token: str

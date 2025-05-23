@@ -28,6 +28,8 @@ def scan_task(self, data):
         open_ports_opts=task.open_ports_opts,
         service_opts=task.service_opts,
         timeout=task.timeout,
+        include_services=task.include_services,
+        mode=task.mode
     )
 
 

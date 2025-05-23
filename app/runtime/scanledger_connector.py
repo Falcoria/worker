@@ -4,6 +4,7 @@ import urllib3
 
 from app.config import config
 from app.logger import logger
+from app.constants.task_schemas import ImportMode
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -15,37 +16,51 @@ class ScanledgerConnector:
         logger.debug(f"BackendConnector initialized with server URL: {self.server_url} and auth token: {self.auth_token}")
         self.session = requests.Session()
         self.session.verify = False  # Disable SSL verification for the whole session
+        self.session.headers.update({"Authorization": f"Bearer {self.auth_token}"})
 
     def make_request(
-            self, 
-            url: str, 
-            headers: dict = None, 
-            method: str = "GET", 
-            data=None, 
-            timeout: int = 20, 
-            files=None):
-        """Make synchronous HTTP request"""
-        headers = headers or {}
-        headers["Authorization"] = f"Bearer {self.auth_token}"
-
-        logger.debug(f"Making {method} request to {url} with headers: {headers} and data: {data}")
-
+        self,
+        url: str,
+        method: str = "GET",
+        query_params: dict = None,
+        json_body: dict = None,
+        timeout: int = 20,
+        files=None
+    ):
+        """Make HTTP request with proper separation of query params and JSON body"""
         try:
             if method in ["GET", "DELETE"]:
-                response = self.session.request(method, url, headers=headers, params=data, timeout=timeout)
+                response = self.session.request(
+                    method=method,
+                    url=url,
+                    params=query_params,
+                    timeout=timeout
+                )
             elif files is not None:
-                response = self.session.post(url, headers=headers, files=files, timeout=timeout)
+                response = self.session.post(
+                    url=url,
+                    params=query_params,
+                    files=files,
+                    timeout=timeout
+                )
             elif method in ["POST", "PUT"]:
-                response = self.session.request(method, url, headers=headers, json=data, timeout=timeout)
+                response = self.session.request(
+                    method=method,
+                    url=url,
+                    params=query_params,
+                    json=json_body,
+                    timeout=timeout
+                )
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
             return response
+
         except requests.RequestException as e:
-            logger.error(f"Request error in BackendConnector.make_request: {e}")
+            logger.error(f"Request error: {e}")
             return None
         except Exception as e:
-            logger.error(f"Unexpected error in BackendConnector.make_request: {e}")
+            logger.error(f"Unexpected error: {e}")
             return None
 
     @staticmethod
@@ -57,10 +72,10 @@ class ScanledgerConnector:
         elif response.status_code == 401:
             logger.error("Unauthorized access (401).")
         else:
-            logger.error(f"Unexpected status: {response.status_code}")
+            logger.error(f"Unexpected status: {response.status_code} - {response.text}")
         return None
 
-    def upload_nmap_report(self, project: UUID, report: str):
+    def upload_nmap_report(self, project: UUID, report: str, mode: ImportMode):
         url = f"{self.server_url}/projects/{project}/ips/import"
 
         files = {
@@ -70,7 +85,8 @@ class ScanledgerConnector:
         response = self.make_request(
             url=url,
             method="POST",
-            files=files,
+            query_params={"mode": mode.value},
+            files=files
         )
 
         if response is None:

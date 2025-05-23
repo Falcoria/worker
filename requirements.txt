@@ -2,5 +2,5 @@ pydantic-settings
 redis
 urllib3
 requests
-celery
+celery[redis]
 python-libnmap

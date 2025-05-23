@@ -10,6 +10,7 @@ from .command_executor import OsCommandExecutor
 from .scanledger_connector import ScanledgerConnector
 
 from app.logger import logger
+from app.constants.task_schemas import ImportMode
 
 
 def get_project_pids_key(project: str) -> str:
@@ -45,7 +46,15 @@ class RedisNmapWrapper:
         entry = json.dumps({"pid": pid, "host": self.hostname})
         self.redis.lrem(self.key, 0, entry)
 
-    def run_two_phase_background(self, target: str, open_ports_opts: str, service_opts: str, timeout: int):
+    def run_two_phase_background(
+            self, 
+            target: str, 
+            open_ports_opts: str, 
+            service_opts: str, 
+            timeout: int, 
+            include_services: bool,
+            mode: ImportMode
+        ):
         # Phase 1: Open ports
         executor1 = OsCommandExecutor(timeout=timeout)
         nmap1 = NmapRunner(executor1)
@@ -68,9 +77,17 @@ class RedisNmapWrapper:
             logger.error(f"No open ports found for the target. {target}")
             return
 
+        scanledger_connector = ScanledgerConnector()
+
+        if not include_services:
+            logger.info(f"Open ports found: {ports}")
+            scanledger_connector.upload_nmap_report(self.project, nmap1.read_output(), mode)
+            return
+
         # Phase 2: Service scan
         executor2 = OsCommandExecutor(timeout=timeout)
         nmap2 = NmapRunner(executor2)
+        logger.info(f"Running service scan on ports: {ports}")
         nmap2.run_service_scan_background(target, ports, service_opts)
         self._store_pid(executor2.process.pid)
         nmap2.wait()
@@ -78,8 +95,11 @@ class RedisNmapWrapper:
 
         logger.info(f"Two-phase scan completed for {target}.")
 
-        backend_connector = ScanledgerConnector()
-        backend_connector.upload_nmap_report(self.project, nmap2.read_output())
+        scanledger_connector.upload_nmap_report(self.project, nmap2.read_output(), mode)
+        
+        # Mode APPEND ensures that open ports discovered in Phase 1 are preserved,
+        # even if some of them are blocked or filtered during the service scan phase.
+        scanledger_connector.upload_nmap_report(self.project, nmap1.read_output(), ImportMode.APPEND)
 
 
 class RedisProcessKiller:
