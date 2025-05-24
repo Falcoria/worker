@@ -30,6 +30,9 @@ class RedisTaskTracker:
     def remove_task_id(self, task_id: str):
         self.redis.lrem(self.key, 0, task_id)
 
+    def remove_ip_task(self, ip: str):
+        self.redis.hdel(f"project:{self.project}:ip_task_map", ip)
+
 
 class RedisNmapWrapper:
     def __init__(self, redis_client: redis.Redis, project: str):
@@ -64,7 +67,7 @@ class RedisNmapWrapper:
         self._remove_pid(executor1.process.pid)
 
         # check for errors
-        # TODO: if error -> send to backend with message
+        # TODO: if error upon scanning -> send to backend with message. 
         # TODO: enum for error codes
 
         report = nmap1.parse_output()
@@ -130,29 +133,24 @@ class RedisProcessKiller:
             info = json.loads(entry)
 
             if not isinstance(info, dict) or "host" not in info or "pid" not in info:
-                #print(f"⚠️ Skipping malformed entry: {entry}")
                 logger.warning(f"Skipping malformed entry: {entry}")
                 return None
 
             return info
 
         except Exception as e:
-            #print(f"❌ Failed to parse entry: {entry}. Error: {e}")
             logger.error(f"Failed to parse entry: {entry}. Error: {e}")
             return None
 
     def _terminate_pid(self, pid: int, entry: str):
-        #print(f"⛔ Attempting to kill PID {pid} on {self.hostname}")
         logger.info(f"Attempting to kill PID {pid} on {self.hostname}")
         try:
             if self._is_pid_alive(pid):
                 os.kill(pid, signal.SIGTERM)
                 logger.info(f"SIGTERM sent to PID {pid}")
             else:
-                #print(f"⚠️ Process {pid} already exited.")
                 logger.warning(f"Process {pid} already exited.")
         except Exception as e:
-            #print(f"❌ Error while killing PID {pid}: {e}")
             logger.error(f"Error while killing PID {pid}: {e}")
         finally:
             self.redis.lrem(self.key, 0, entry)

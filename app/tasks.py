@@ -52,7 +52,11 @@ def cleanup_task_id(sender=None, task_id=None, task=None, args=None, kwargs=None
         data = args[0]
         if isinstance(data, dict):
             project = data.get("project")
+            ip = data.get("ip")
             if project:
                 logger.info(f"Removing task_id {task_id} for project {project}")
                 tracker = RedisTaskTracker(redis_client, project)
                 tracker.remove_task_id(task_id)
+                if ip:
+                    tracker.remove_ip_task(ip)
+                    logger.info(f"Also removed IP {ip} from project:{project}:ip_task_map")
