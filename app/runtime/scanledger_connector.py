@@ -40,7 +40,7 @@ class ScanledgerConnector:
                 response = self.session.post(
                     url=url,
                     params=query_params,
-                    files=files,
+                    json=json_body,
                     timeout=timeout
                 )
             elif method in ["POST", "PUT"]:
@@ -94,3 +94,16 @@ class ScanledgerConnector:
             return None
 
         return self.process_response(response)
+
+    def create_ip(self, project: UUID, query: str = None, ips: list = None):
+        url = f"{self.server_url}/projects/{project}/ips"
+        response = self.make_request(
+            url=url,
+            method="POST",
+            json_body=ips,
+            query_params=query
+        )
+
+        if response is None:
+            logger.error("No response received from backend.")
+            return None
