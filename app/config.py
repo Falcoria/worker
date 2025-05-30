@@ -29,7 +29,7 @@ class Config(BaseSettings):
     logger_name: str = "worker_logger"
     logger_level: str = "INFO"
 
-    backend_base_url: str = "http://localhost:8000"
+    backend_base_url: str
     worker_backend_token: str
 
     model_config = SettingsConfigDict(env_file=".env")
