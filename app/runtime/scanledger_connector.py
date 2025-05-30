@@ -40,7 +40,8 @@ class ScanledgerConnector:
                 response = self.session.post(
                     url=url,
                     params=query_params,
-                    json=json_body,
+                    files=files,
+                    data={},
                     timeout=timeout
                 )
             elif method in ["POST", "PUT"]:
