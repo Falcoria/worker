@@ -75,12 +75,15 @@ class RedisNmapWrapper:
             logger.error("Failed to parse report from open ports phase.")
             return
 
+        scanledger_connector = ScanledgerConnector()
+
         ports = nmap1.get_open_ports_single_host(report)
         if not ports:
-            logger.error(f"No open ports found for the target. {target}")
+            data = [{"ip": target, "ports": []}]
+            query = {"mode": mode.value}
+            logger.info(f"No open ports found for the target. {target}")
+            scanledger_connector.create_ip(self.project, query=query, ips=data)
             return
-
-        scanledger_connector = ScanledgerConnector()
 
         if not include_services:
             logger.info(f"Open ports found: {ports}")
