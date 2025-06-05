@@ -126,6 +126,7 @@ class RedisProcessKiller:
             if info["host"] != self.hostname:
                 continue
 
+            logger.info(f"Terminating process on {self.hostname} with PID {info['pid']}")
             self._terminate_pid(info["pid"], entry)
 
     def _parse_entry(self, entry) -> dict:

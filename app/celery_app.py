@@ -1,5 +1,6 @@
 from celery import Celery
 from kombu import Exchange, Queue
+from kombu.common import Broadcast
 
 from app.config import config
 from app.constants.task_names import TaskNames
@@ -15,11 +16,9 @@ celery_app.conf.task_queues = [
         exchange=app_exchange,
         routing_key=config.nmap_scan_routing_key,
     ),
-    Queue(
-        name=config.nmap_cancel_queue_name,
-        exchange=app_exchange,
-        routing_key=config.nmap_cancel_routing_key,
-    ),
+    Broadcast(
+        name=config.nmap_cancel_queue_name
+    )
 ]
 
 
@@ -30,7 +29,6 @@ celery_app.conf.task_routes = {
     },
     TaskNames.PROJECT_CANCEL: {
         "queue": config.nmap_cancel_queue_name,
-        "routing_key": config.nmap_cancel_routing_key,
     },
 }
 

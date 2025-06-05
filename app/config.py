@@ -17,6 +17,8 @@ class Config(BaseSettings):
     nmap_cancel_queue_name: str = "nmap_cancel_queue"
     nmap_scan_routing_key: str = "nmap.scan"
     nmap_cancel_routing_key: str = "nmap.cancel"
+    nmap_cancel_exchange_name: str = "nmap_cancel_exchange"
+    nmap_cancel_exchange_type: str = "fanout"
 
     redis_pass: str
     redis_host: str = "myserver"
