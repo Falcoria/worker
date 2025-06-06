@@ -4,7 +4,6 @@ from kombu.common import Broadcast
 
 from app.config import config
 from app.constants.task_names import TaskNames
-from app.runtime.ip_initializer import register_worker_ip
 
 
 celery_app = Celery(config.celery_app_name, broker=config.ampq_connection_str)
@@ -18,9 +17,11 @@ celery_app.conf.task_queues = [
     ),
     Broadcast(
         name=config.nmap_cancel_queue_name
+    ),
+    Broadcast(
+        name=config.worker_service_broadcast_queue,
     )
 ]
-
 
 celery_app.conf.task_routes = {
     TaskNames.PROJECT_SCAN: {
@@ -30,9 +31,12 @@ celery_app.conf.task_routes = {
     TaskNames.PROJECT_CANCEL: {
         "queue": config.nmap_cancel_queue_name,
     },
+    TaskNames.UPDATE_WORKER_IP: {
+        "queue": config.worker_service_broadcast_queue,
+    },
 }
-
 
 celery_app.conf.worker_prefetch_multiplier = 1
 celery_app.conf.task_acks_late = True
 celery_app.conf.task_reject_on_worker_lost = True
+celery_app.conf.timezone = 'UTC'

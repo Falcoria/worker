@@ -1,4 +1,4 @@
-from app.runtime.ip_initializer import register_worker_ip
+from app.runtime.update_ip import register_worker_ip
 
 
 def init_worker_ip():

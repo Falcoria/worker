@@ -9,7 +9,7 @@ from app.redis_client import redis_client
 from app.constants.task_names import TaskNames
 from app.constants.task_schemas import NmapTask
 from app.runtime.redis_wrappers import RedisNmapWrapper, RedisProcessKiller, RedisTaskTracker 
-from app.runtime.ip_initializer import register_worker_ip
+from app.runtime.update_ip import register_worker_ip
 from app.initializers import init_worker_ip
 
 
@@ -44,6 +44,13 @@ def cancel_task(self, data):
 
     # Optional: clean up any stale lock
     redis_client.delete(f"scan:lock:{socket.gethostname()}")
+
+
+@celery_app.task(name=TaskNames.UPDATE_WORKER_IP)
+def update_worker_ip_task():
+    logger.info("Running UPDATE_WORKER_IP task")
+    register_worker_ip()
+    logger.info("Worker IP registered successfully")
 
 
 @task_postrun.connect

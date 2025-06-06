@@ -19,11 +19,14 @@ class Config(BaseSettings):
     nmap_cancel_routing_key: str = "nmap.cancel"
     nmap_cancel_exchange_name: str = "nmap_cancel_exchange"
     nmap_cancel_exchange_type: str = "fanout"
+    worker_service_broadcast_queue: str = "worker_service_broadcast"
 
     redis_pass: str
     redis_host: str = "myserver"
     redis_port: int = 6379
     redis_db: int = 3
+
+    ip_entry_ttl: int = 3600 + 400
 
     nmap_open_ports_opts: str = "-p- --open"
     nmap_service_opts: str = "-sV -Pn -T4"
