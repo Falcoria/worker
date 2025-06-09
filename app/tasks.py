@@ -36,6 +36,7 @@ def scan_task(self, data):
     finally:
         # Guaranteed to run
         tracker.remove_ip_task(task.ip)
+        tracker.release_ip_lock(task.ip)
         logger.info(f"Removed IP {task.ip} from project:{task.project}:ip_task_map (via finally)")
 
 

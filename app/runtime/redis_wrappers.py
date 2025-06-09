@@ -39,6 +39,17 @@ class RedisTaskTracker:
         """Remove entry for IP."""
         self.redis.hdel(self.ip_task_map_key, ip)
 
+    def acquire_ip_lock(self, ip: str, ttl_seconds: int = 300) -> bool:
+        """Acquire a Redis lock for an IP."""
+        key = f"project:{self.project}:ip_task_lock:{ip}"
+        was_set = self.redis.set(key, "1", ex=ttl_seconds, nx=True)
+        return was_set is True
+
+    def release_ip_lock(self, ip: str):
+        """Release the Redis lock for an IP."""
+        key = f"project:{self.project}:ip_task_lock:{ip}"
+        self.redis.delete(key)
+
 
 class RedisNmapWrapper:
     def __init__(self, redis_client: redis.Redis, project: str):
