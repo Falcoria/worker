@@ -17,21 +17,27 @@ def get_project_pids_key(project: str) -> str:
     return f"project:{project}:pids"
 
 
-def get_project_task_ids_key(project: str) -> str:
-    return f"project:{project}:task_ids"
+def get_project_ip_task_map_key(project: str) -> str:
+    return f"project:{project}:ip_task_map"
 
 
 class RedisTaskTracker:
     def __init__(self, redis_client: redis.Redis, project: str):
         self.redis = redis_client
         self.project = project
-        self.key = get_project_task_ids_key(project)
+        self.ip_task_map_key = get_project_ip_task_map_key(project)
 
-    def remove_task_id(self, task_id: str):
-        self.redis.lrem(self.key, 0, task_id)
+    def track_ip_task(self, ip: str, task_id: str):
+        """Track IP → task_id."""
+        self.redis.hset(self.ip_task_map_key, ip, task_id)
+
+    def get_ip_task_map(self):
+        """Return IP → task_id map."""
+        return self.redis.hgetall(self.ip_task_map_key)
 
     def remove_ip_task(self, ip: str):
-        self.redis.hdel(f"project:{self.project}:ip_task_map", ip)
+        """Remove entry for IP."""
+        self.redis.hdel(self.ip_task_map_key, ip)
 
 
 class RedisNmapWrapper:
@@ -66,10 +72,6 @@ class RedisNmapWrapper:
         nmap1.wait()
         self._remove_pid(executor1.process.pid)
 
-        # check for errors
-        # TODO: if error upon scanning -> send to backend with message. 
-        # TODO: enum for error codes
-
         report = nmap1.parse_output()
         if not report:
             logger.error("Failed to parse report from open ports phase.")
@@ -103,8 +105,7 @@ class RedisNmapWrapper:
 
         scanledger_connector.upload_nmap_report(self.project, nmap2.read_output(), mode)
         
-        # Mode APPEND ensures that open ports discovered in Phase 1 are preserved,
-        # even if some of them are blocked or filtered during the service scan phase.
+        # Mode APPEND ensures that open ports discovered in Phase 1 are preserved.
         scanledger_connector.upload_nmap_report(self.project, nmap1.read_output(), ImportMode.APPEND)
 
 

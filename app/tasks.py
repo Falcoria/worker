@@ -1,6 +1,5 @@
 import socket
 
-from celery import shared_task
 from celery.signals import task_postrun
 
 from app.logger import logger
@@ -21,21 +20,27 @@ def scan_task(self, data):
     task = NmapTask(**data)
     logger.info(f"Received scan task for {task.ip} in project {task.project}")
 
+    tracker = RedisTaskTracker(redis_client, task.project)
     wrapper = RedisNmapWrapper(redis_client=redis_client, project=task.project)
-    logger.info(f"Starting 2-phase scan with Redis tracking for {task.ip}")
-    wrapper.run_two_phase_background(
-        target=task.ip,
-        open_ports_opts=task.open_ports_opts,
-        service_opts=task.service_opts,
-        timeout=task.timeout,
-        include_services=task.include_services,
-        mode=task.mode
-    )
+
+    try:
+        logger.info(f"Starting 2-phase scan with Redis tracking for {task.ip}")
+        wrapper.run_two_phase_background(
+            target=task.ip,
+            open_ports_opts=task.open_ports_opts,
+            service_opts=task.service_opts,
+            timeout=task.timeout,
+            include_services=task.include_services,
+            mode=task.mode
+        )
+    finally:
+        # Guaranteed to run
+        tracker.remove_ip_task(task.ip)
+        logger.info(f"Removed IP {task.ip} from project:{task.project}:ip_task_map (via finally)")
 
 
 @celery_app.task(name=TaskNames.PROJECT_CANCEL, bind=True)
 def cancel_task(self, data):
-    #project = data.get("project")
     project = data
     logger.info(f"Cancel requested for project: {project}")
     
@@ -53,6 +58,7 @@ def update_worker_ip_task():
     logger.info("Worker IP registered successfully")
 
 
+"""
 @task_postrun.connect
 def cleanup_task_id(sender=None, task_id=None, task=None, args=None, kwargs=None, **extras):
     if sender and sender.name == TaskNames.PROJECT_SCAN and args:
@@ -61,9 +67,9 @@ def cleanup_task_id(sender=None, task_id=None, task=None, args=None, kwargs=None
             project = data.get("project")
             ip = data.get("ip")
             if project:
-                logger.info(f"Removing task_id {task_id} for project {project}")
+                logger.info(f"Cleaning up IP mapping for project {project}")
                 tracker = RedisTaskTracker(redis_client, project)
-                tracker.remove_task_id(task_id)
                 if ip:
                     tracker.remove_ip_task(ip)
-                    logger.info(f"Also removed IP {ip} from project:{project}:ip_task_map")
+                    logger.info(f"Removed IP {ip} from project:{project}:ip_task_map")
+"""
