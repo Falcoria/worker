@@ -27,6 +27,7 @@ def scan_task(self, data):
         logger.info(f"Starting 2-phase scan with Redis tracking for {task.ip}")
         wrapper.run_two_phase_background(
             target=task.ip,
+            hostnames=task.hostnames,
             open_ports_opts=task.open_ports_opts,
             service_opts=task.service_opts,
             timeout=task.timeout,

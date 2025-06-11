@@ -67,17 +67,21 @@ class RedisNmapWrapper:
         self.redis.lrem(self.key, 0, entry)
 
     def run_two_phase_background(
-            self, 
-            target: str, 
-            open_ports_opts: str, 
-            service_opts: str, 
-            timeout: int, 
-            include_services: bool,
-            mode: ImportMode
-        ):
+        self, 
+        target: str, 
+        hostnames: list,
+        open_ports_opts: str, 
+        service_opts: str, 
+        timeout: int, 
+        include_services: bool,
+        mode: ImportMode
+    ):
+        scanledger_connector = ScanledgerConnector()
+
         # Phase 1: Open ports
         executor1 = OsCommandExecutor(timeout=timeout)
         nmap1 = NmapRunner(executor1)
+
         nmap1.run_open_ports_background(target, open_ports_opts)
         self._store_pid(executor1.process.pid)
         nmap1.wait()
@@ -88,24 +92,25 @@ class RedisNmapWrapper:
             logger.error("Failed to parse report from open ports phase.")
             return
 
-        scanledger_connector = ScanledgerConnector()
-
         ports = nmap1.get_open_ports_single_host(report)
+
+        # Always inject hostnames and upload Phase 1, even if no ports
+        modified_nmap1_xml = nmap1.inject_hostnames_into_output(target, hostnames)
+
         if not ports:
-            data = [{"ip": target, "ports": []}]
-            query = {"mode": mode.value}
-            logger.info(f"No open ports found for the target. {target}")
-            scanledger_connector.create_ip(self.project, query=query, ips=data)
+            logger.info(f"No open ports found for target {target}. Uploading Phase 1 report with hostnames.")
+            scanledger_connector.upload_nmap_report(self.project, modified_nmap1_xml, mode)
             return
 
         if not include_services:
-            logger.info(f"Open ports found: {ports}")
-            scanledger_connector.upload_nmap_report(self.project, nmap1.read_output(), mode)
+            logger.info(f"Open ports found: {ports}. Uploading Phase 1 report with hostnames only.")
+            scanledger_connector.upload_nmap_report(self.project, modified_nmap1_xml, mode)
             return
 
         # Phase 2: Service scan
         executor2 = OsCommandExecutor(timeout=timeout)
         nmap2 = NmapRunner(executor2)
+
         logger.info(f"Running service scan on ports: {ports}")
         nmap2.run_service_scan_background(target, ports, service_opts)
         self._store_pid(executor2.process.pid)
@@ -114,10 +119,12 @@ class RedisNmapWrapper:
 
         logger.info(f"Two-phase scan completed for {target}.")
 
-        scanledger_connector.upload_nmap_report(self.project, nmap2.read_output(), mode)
-        
-        # Mode APPEND ensures that open ports discovered in Phase 1 are preserved.
-        scanledger_connector.upload_nmap_report(self.project, nmap1.read_output(), ImportMode.APPEND)
+        # Upload Phase 2 result with hostnames
+        modified_nmap2_xml = nmap2.inject_hostnames_into_output(target, hostnames)
+        scanledger_connector.upload_nmap_report(self.project, modified_nmap2_xml, mode)
+
+        # Upload Phase 1 result again in APPEND mode → ensures Phase 1 ports preserved
+        scanledger_connector.upload_nmap_report(self.project, modified_nmap1_xml, ImportMode.APPEND)
 
 
 class RedisProcessKiller:

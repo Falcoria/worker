@@ -1,6 +1,7 @@
 import os
 import tempfile
 from typing import Optional, List, Dict
+import xml.etree.ElementTree as ET
 
 from libnmap.objects.report import NmapReport
 from libnmap.parser import NmapParser, NmapParserException
@@ -77,6 +78,42 @@ class NmapRunner:
             return None
         with open(self.output_file, "r") as f:
             return f.read()
+        
+    def inject_hostnames_into_output(self, target_ip: str, hostnames: List[str]) -> Optional[str]:
+        """
+        Inject hostnames into current Nmap XML output. Returns modified XML string.
+        """
+        if not self.output_file or not os.path.exists(self.output_file):
+            return None
+
+        with open(self.output_file, "r") as f:
+            xml_content = f.read()
+
+        tree = ET.ElementTree(ET.fromstring(xml_content))
+        root = tree.getroot()
+
+        for host in root.findall("host"):
+            address_elem = host.find("address")
+            if address_elem is not None and address_elem.attrib.get("addr") == target_ip:
+                # Find or create <hostnames> element
+                hostnames_elem = host.find("hostnames")
+                if hostnames_elem is None:
+                    hostnames_elem = ET.SubElement(host, "hostnames")
+                else:
+                    # Optional: clear existing hostnames → up to you
+                    hostnames_elem.clear()
+
+                for hname in hostnames:
+                    ET.SubElement(
+                        hostnames_elem, "hostname",
+                        attrib={
+                            "name": hname,
+                            "type": "user"  # indicates manual addition
+                        }
+                    )
+
+        # Serialize back to string
+        return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
 
     @staticmethod
     def get_open_ports_single_host(report: NmapReport) -> List[int]:
