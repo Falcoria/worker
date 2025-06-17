@@ -1,5 +1,5 @@
 from celery import Celery
-from kombu import Exchange, Queue
+from kombu import Exchange, Queue, Connection
 from kombu.common import Broadcast
 
 from app.config import config
@@ -22,6 +22,12 @@ celery_app.conf.task_queues = [
         name=config.worker_service_broadcast_queue,
     )
 ]
+
+
+with Connection(config.ampq_connection_str) as conn:
+    for name in [config.nmap_cancel_queue_name, config.worker_service_broadcast_queue]:
+        Broadcast(name=name).exchange(conn).declare()
+
 
 celery_app.conf.task_routes = {
     TaskNames.PROJECT_SCAN: {
