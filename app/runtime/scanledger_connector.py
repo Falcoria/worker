@@ -76,8 +76,8 @@ class ScanledgerConnector:
             logger.error(f"Unexpected status: {response.status_code} - {response.text}")
         return None
 
-    def upload_nmap_report(self, project: UUID, report: str, mode: ImportMode):
-        url = f"{self.server_url}/projects/{project}/ips/import"
+    def upload_nmap_report(self, project_id: str, report: str, mode: ImportMode):
+        url = f"{self.server_url}/projects/{project_id}/ips/import"
 
         files = {
             "file": ("nmap_report.xml", report, "text/xml")

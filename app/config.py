@@ -1,4 +1,5 @@
-# config.py
+import socket
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Config(BaseSettings):
@@ -36,6 +37,8 @@ class Config(BaseSettings):
 
     backend_base_url: str
     worker_backend_token: str
+
+    hostname: str = socket.gethostname()
 
     model_config = SettingsConfigDict(env_file=".env")
 

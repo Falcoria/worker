@@ -4,6 +4,7 @@ import errno
 import socket
 import json
 import redis
+import time
 
 from .nmap_runner import NmapRunner
 from .command_executor import OsCommandExecutor
@@ -11,6 +12,7 @@ from .scanledger_connector import ScanledgerConnector
 
 from app.logger import logger
 from app.constants.task_schemas import ImportMode
+from app.constants.schemas import RunningTarget
 
 
 def get_project_pids_key(project: str) -> str:
@@ -22,10 +24,10 @@ def get_project_ip_task_map_key(project: str) -> str:
 
 
 class RedisTaskTracker:
-    def __init__(self, redis_client: redis.Redis, project: str):
+    def __init__(self, redis_client: redis.Redis, project_id: str):
         self.redis = redis_client
-        self.project = project
-        self.ip_task_map_key = get_project_ip_task_map_key(project)
+        self.project = project_id
+        self.ip_task_map_key = get_project_ip_task_map_key(project_id)
 
     def track_ip_task(self, ip: str, task_id: str):
         """Track IP → task_id."""
@@ -49,6 +51,23 @@ class RedisTaskTracker:
         """Release the Redis lock for an IP."""
         key = f"project:{self.project}:ip_task_lock:{ip}"
         self.redis.delete(key)
+
+    def _running_targets_key(self):
+        return f"project:{self.project}:running_targets"
+    
+    def store_running_target(self, target: RunningTarget):
+        key = self._running_targets_key()
+        value = target.model_dump_json()
+        self.redis.rpush(key, value)
+
+    def remove_running_target(self, ip: str, worker: str):
+            key = self._running_targets_key()
+            running = self.redis.lrange(key, 0, -1)
+            for entry in running:
+                data = json.loads(entry.decode() if isinstance(entry, bytes) else entry)
+                if data["ip"] == ip and data.get("worker") == worker:
+                    self.redis.lrem(key, 0, entry)
+                    break
 
 
 class RedisNmapWrapper:
@@ -76,6 +95,7 @@ class RedisNmapWrapper:
         include_services: bool,
         mode: ImportMode
     ):
+        # TODO: add try except finally
         scanledger_connector = ScanledgerConnector()
 
         # Phase 1: Open ports

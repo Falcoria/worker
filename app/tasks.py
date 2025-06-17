@@ -10,6 +10,8 @@ from app.constants.task_schemas import NmapTask
 from app.runtime.redis_wrappers import RedisNmapWrapper, RedisProcessKiller, RedisTaskTracker 
 from app.runtime.update_ip import register_worker_ip
 from app.initializers import init_worker_ip
+from app.config import config
+from app.constants.schemas import RunningTarget
 
 
 init_worker_ip()
@@ -24,6 +26,13 @@ def scan_task(self, data):
     wrapper = RedisNmapWrapper(redis_client=redis_client, project=task.project)
 
     try:
+        target = RunningTarget(
+            ip=task.ip,
+            hostnames=task.hostnames,
+            worker=config.hostname
+        )
+        tracker.store_running_target(target)
+
         logger.info(f"Starting 2-phase scan with Redis tracking for {task.ip}")
         wrapper.run_two_phase_background(
             target=task.ip,
@@ -36,6 +45,7 @@ def scan_task(self, data):
         )
     finally:
         # Guaranteed to run
+        tracker.remove_running_target(ip=task.ip, worker=config.hostname)
         tracker.remove_ip_task(task.ip)
         tracker.release_ip_lock(task.ip)
         logger.info(f"Removed IP {task.ip} from project:{task.project}:ip_task_map (via finally)")
