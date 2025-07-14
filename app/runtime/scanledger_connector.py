@@ -4,7 +4,8 @@ import urllib3
 
 from app.config import config
 from app.logger import logger
-from app.constants.task_schemas import ImportMode
+#from app.constants.task_schemas import ImportMode
+from falcoria_common.schemas.enums import ImportMode
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 

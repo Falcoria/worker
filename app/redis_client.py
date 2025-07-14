@@ -1,8 +1,7 @@
-import redis
-
 from app.config import config
+from falcoria_common.redis.redis_client import FalcoriaRedisClient
 
-redis_client = redis.StrictRedis(
+redis_client = FalcoriaRedisClient.create_sync_redis(
     host=config.redis_host,
     port=config.redis_port,
     db=config.redis_db,

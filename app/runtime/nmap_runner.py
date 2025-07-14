@@ -22,29 +22,12 @@ class NmapRunner:
         tmp.close()
         return ["nmap"] + options.split() + ["-oX", self.output_file, target]
 
-    def run_open_ports_foreground(
-            self, 
-            target: str, 
-            options: str = config.nmap_open_ports_opts
-        ) -> bool:
-        return self.executor.run_foreground(self._build_command(target, options))
-
     def run_open_ports_background(
             self, 
             target: str, 
             options: str = config.nmap_open_ports_opts
         ) -> None:
         self.executor.run_background(self._build_command(target, options))
-
-    def run_service_scan_foreground(
-            self, 
-            target: str, 
-            ports: List[int], 
-            base_options: str = config.nmap_service_opts
-        ) -> bool:
-        port_str = ",".join(map(str, ports))
-        options = f"-p {port_str} {base_options}"
-        return self.executor.run_foreground(self._build_command(target, options))
 
     def run_service_scan_background(
             self, 

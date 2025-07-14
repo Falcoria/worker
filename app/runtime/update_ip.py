@@ -4,6 +4,7 @@ import requests
 
 from app.redis_client import redis_client
 from app.config import config
+from falcoria_common.redis.redis_keys import RedisKeyBuilder
 
 
 def get_external_ip() -> str:
@@ -16,7 +17,7 @@ def get_external_ip() -> str:
 def register_worker_ip():
     ip = get_external_ip()
     hostname = config.hostname
-    key = f"worker_ip:{hostname}"
+    key = RedisKeyBuilder.worker_ip_key(hostname)
 
     data = {
         "ip": ip,

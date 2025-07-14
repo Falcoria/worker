@@ -4,3 +4,4 @@ urllib3
 requests
 celery[redis]
 python-libnmap
+git+https://github.com/Falcoria/falcoria-common.git@main
