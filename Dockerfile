@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     nmap \
     gcc \
     supervisor \
+    git \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
