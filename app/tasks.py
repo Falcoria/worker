@@ -4,7 +4,7 @@ import socket
 from app.logger import logger
 from app.celery_app import celery_app
 from app.redis_client import redis_client
-from falcoria_common.schemas.enums import TaskNames
+from falcoria_common.schemas.enums.celery_routes import NmapTasks, WorkerTasks
 from app.runtime.redis_wrappers import RedisNmapWrapper, RedisProcessKiller, RedisTaskTracker, RedisWorkerCleaner
 from app.runtime.update_ip import register_worker_ip
 from app.initializers import init_worker_ip
@@ -15,7 +15,7 @@ from falcoria_common.schemas.nmap import RunningNmapTarget, NmapTask
 init_worker_ip()
 
 
-@celery_app.task(name=TaskNames.NMAP_SCAN, bind=True)
+@celery_app.task(name=NmapTasks.NMAP_SCAN, bind=True)
 def scan_task(self, data):
     task = NmapTask(**data)
     logger.info(f"Received scan task for {task.ip} in project {task.project}")
@@ -60,7 +60,7 @@ def scan_task(self, data):
         logger.info(f"Removed IP {task.ip} from project:{task.project}:ip_task_map (via finally)")
 
 
-@celery_app.task(name=TaskNames.NMAP_CANCEL, bind=True)
+@celery_app.task(name=NmapTasks.NMAP_CANCEL, bind=True)
 def cancel_task(self, data):
     task_ids = data.get("task_ids", [])
     
@@ -71,7 +71,7 @@ def cancel_task(self, data):
     redis_client.delete(f"scan:lock:{socket.gethostname()}")
 
 
-@celery_app.task(name=TaskNames.UPDATE_WORKER_IP)
+@celery_app.task(name=WorkerTasks.UPDATE_WORKER_IP)
 def update_worker_ip_task():
     logger.info("Running UPDATE_WORKER_IP task")
     register_worker_ip()

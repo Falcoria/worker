@@ -2,11 +2,11 @@ import os
 import json
 import errno
 import signal
-import socket
+
 
 from app.logger import logger
 from app.config import config
-from falcoria_common.schemas.enums import ImportMode
+from falcoria_common.schemas.enums.common import ImportMode
 from falcoria_common.schemas.nmap import RunningNmapTarget
 from .nmap_runner import NmapRunner
 from .command_executor import OsCommandExecutor
@@ -90,15 +90,12 @@ class RedisNmapWrapper:
     ):
         scanledger_connector = ScanledgerConnector()
 
+        # Phase 1: Port scan
         executor1 = OsCommandExecutor(timeout=timeout)
         nmap1 = NmapRunner(executor1)
 
         nmap1.run_open_ports_background(target, open_ports_opts)
-        self.redis_tracker.track_pid_entry(
-            pid=executor1.process.pid,
-            task_id=task_id
-        )
-
+        self.redis_tracker.track_pid_entry(pid=executor1.process.pid, task_id=task_id)
         nmap1.wait()
         self.redis_tracker.remove_pid_entry(task_id)
 
@@ -107,38 +104,50 @@ class RedisNmapWrapper:
             logger.error("Failed to parse report from open ports phase.")
             return
 
-        ports = nmap1.get_open_ports_single_host(report)
-        modified_nmap1_xml = nmap1.inject_hostnames_into_output(target, hostnames)
-
-        if not ports:
-            logger.info(f"No open ports found for target {target}. Uploading Phase 1 report with hostnames.")
-            scanledger_connector.upload_nmap_report(self.project, modified_nmap1_xml, mode)
+        open_ports = nmap1.get_open_ports_single_host(report)
+        if not open_ports:
+            logger.info(f"No open ports found for target {target}. Uploading base scan with hostnames.")
+            final_xml = nmap1.enrich_nmap_report(
+                base_xml_path=nmap1.output_file,
+                service_xml_path=None,
+                target_ip=target,
+                hostnames=hostnames
+            )
+            scanledger_connector.upload_nmap_report(self.project, final_xml, mode)
             return
 
         if not include_services:
-            logger.info(f"Open ports found: {ports}. Uploading Phase 1 report with hostnames only.")
-            scanledger_connector.upload_nmap_report(self.project, modified_nmap1_xml, mode)
+            logger.info(f"Open ports found: {open_ports}. Uploading base scan without service enrichment.")
+            final_xml = nmap1.enrich_nmap_report(
+                base_xml_path=nmap1.output_file,
+                service_xml_path=None,
+                target_ip=target,
+                hostnames=hostnames
+            )
+            scanledger_connector.upload_nmap_report(self.project, final_xml, mode)
             return
 
+        # Phase 2: Service scan on open ports only
         executor2 = OsCommandExecutor(timeout=timeout)
         nmap2 = NmapRunner(executor2)
 
-        logger.info(f"Running service scan on ports: {ports}")
-        nmap2.run_service_scan_background(target, ports, service_opts)
+        logger.info(f"Running service scan on ports: {open_ports}")
+        nmap2.run_service_scan_background(target, open_ports, service_opts)
 
-        self.redis_tracker.track_pid_entry(
-            pid=executor2.process.pid,
-            task_id=task_id
-        )
-
+        self.redis_tracker.track_pid_entry(pid=executor2.process.pid, task_id=task_id)
         nmap2.wait()
         self.redis_tracker.remove_pid_entry(task_id)
 
-        logger.info(f"Two-phase scan completed for {target}.")
+        logger.info(f"Two-phase scan completed for {target}. Uploading merged result.")
 
-        modified_nmap2_xml = nmap2.inject_hostnames_into_output(target, hostnames)
-        scanledger_connector.upload_nmap_report(self.project, modified_nmap2_xml, mode)
-        scanledger_connector.upload_nmap_report(self.project, modified_nmap1_xml, ImportMode.APPEND)
+        # Merge phase 1 + phase 2 results into one enriched XML
+        final_xml = nmap1.enrich_nmap_report(
+            base_xml_path=nmap1.output_file,
+            service_xml_path=nmap2.output_file,
+            target_ip=target,
+            hostnames=hostnames
+        )
+        scanledger_connector.upload_nmap_report(self.project, final_xml, mode)
 
 
 class RedisProcessKiller:

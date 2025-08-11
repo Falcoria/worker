@@ -3,7 +3,7 @@ from kombu import Exchange, Queue, Connection
 from kombu.common import Broadcast
 
 from app.config import config
-from falcoria_common.schemas.enums import TaskNames
+from falcoria_common.schemas.enums.celery_routes import NmapTasks, WorkerTasks
 
 
 celery_app = Celery(config.celery_app_name, broker=config.ampq_connection_str)
@@ -30,14 +30,14 @@ with Connection(config.ampq_connection_str) as conn:
 
 
 celery_app.conf.task_routes = {
-    TaskNames.NMAP_SCAN: {
+    NmapTasks.NMAP_SCAN: {
         "queue": config.nmap_scan_queue_name,
         "routing_key": config.nmap_scan_routing_key,
     },
-    TaskNames.NMAP_CANCEL: {
+    NmapTasks.NMAP_CANCEL: {
         "queue": config.nmap_cancel_queue_name,
     },
-    TaskNames.UPDATE_WORKER_IP: {
+    WorkerTasks.UPDATE_WORKER_IP: {
         "queue": config.worker_service_broadcast_queue,
     },
 }

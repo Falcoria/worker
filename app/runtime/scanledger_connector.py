@@ -5,7 +5,7 @@ import urllib3
 from app.config import config
 from app.logger import logger
 #from app.constants.task_schemas import ImportMode
-from falcoria_common.schemas.enums import ImportMode
+from falcoria_common.schemas.enums.common import ImportMode
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -96,16 +96,3 @@ class ScanledgerConnector:
             return None
 
         return self.process_response(response)
-
-    def create_ip(self, project: UUID, query: str = None, ips: list = None):
-        url = f"{self.server_url}/projects/{project}/ips"
-        response = self.make_request(
-            url=url,
-            method="POST",
-            json_body=ips,
-            query_params=query
-        )
-
-        if response is None:
-            logger.error("No response received from backend.")
-            return None
