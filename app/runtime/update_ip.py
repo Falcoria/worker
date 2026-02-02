@@ -17,11 +17,11 @@ def get_external_ip() -> str:
 def register_worker_ip():
     ip = get_external_ip()
     hostname = config.hostname
-    key = RedisKeyBuilder.worker_ip_key(hostname)
+    key = RedisKeyBuilder.worker_key(hostname)
 
     data = {
         "ip": ip,
         "last_updated": int(time.time())
     }
 
-    redis_client.setex(key, config.ip_entry_ttl, json.dumps(data))
+    redis_client.hset(key, mapping=data)
