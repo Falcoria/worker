@@ -1,99 +1,78 @@
+# Worker
 
-# Falcoria Worker
+Worker is the scan execution component in the [Falcoria](https://github.com/Falcoria/falcoria) distributed scanning system. It pulls tasks from the queue and runs Nmap scans. Results go straight to ScanLedger via API.
 
-Falcoria Worker is the execution agent in the Falcoria system. It receives scan tasks, performs secure Nmap scans, tracks results in Redis, and uploads findings to ScanLedger. Designed for distributed, scalable network scanning with robust task management.
+Each scan has up to two phases: port discovery first, then service detection against the discovered open ports (if enabled in the scan config). Workers don't coordinate with each other — the queue handles task assignment, ScanLedger handles merging.
 
-## Architecture & Main Components
+Adding workers scales throughput linearly. Deploy them on separate machines — cloud VMs, VPSes, VPN endpoints — each with its own network path and IP.
 
-- **Celery**: Handles distributed task queueing and execution. Tasks are defined in `app/tasks.py` and routed via custom queues.
-- **Redis**: Used for task tracking, locking, and metadata storage. See `app/redis_client.py` and `app/runtime/redis_wrappers.py`.
-- **Nmap**: Scans are executed in two phases (open ports, then service scan) via `app/runtime/nmap_runner.py`.
-- **ScanLedger Connector**: Uploads scan results to backend via HTTP (`app/runtime/scanledger_connector.py`).
-- **Supervisor**: Manages worker processes (see `supervisord.conf`).
-- **Docker**: Containerized deployment (see `Dockerfile`).
+## Quick start
 
-## Features
+The fastest way to run everything (ScanLedger + Tasker + Worker + Postgres + Redis + RabbitMQ):
 
-- Receives validated scan/cancel tasks via Celery queues
-- Executes Nmap scans securely with config-driven options
-- Two-phase scan: open ports, then service enrichment
-- Tracks running tasks and process IDs in Redis
-- Cleans up Redis state after task completion/cancellation
-- Uploads results to ScanLedger backend
-- Registers worker IP for service discovery
-- Configurable via environment variables and `.env` file
+```bash
+git clone https://github.com/Falcoria/falcoria.git
+cd falcoria
+./quickstart.sh
+```
 
-## Installation
+See the [all-in-one repo](https://github.com/Falcoria/falcoria) for details.
 
-### Prerequisites
+## Standalone setup
 
-- Python 3.13+
-- Docker (recommended) or direct Python environment
-- Redis server
-- RabbitMQ server
+For distributed deployments where workers run on separate machines:
 
-### Build & Run (Docker)
+```bash
+git clone https://github.com/Falcoria/worker.git
+cd worker
+cp .env.example .env  # edit connection settings
+```
+
+### Docker
 
 ```bash
 docker build -t falcoria-worker .
-docker run --env-file .env -p 6379:6379 falcoria-worker
+docker run --env-file .env falcoria-worker
 ```
 
-### Manual Setup
+### Manual (development)
 
-1. Install system dependencies:
-
-    ```bash
-    sudo apt-get update && sudo apt-get install -y nmap gcc supervisor git
-    ```
-
-2. Install Python dependencies:
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-3. Configure environment variables in `.env` (see `app/config.py` for options).
-
-4. Start Supervisor:
-
-    ```bash
-    supervisord -c supervisord.conf
-    ```
+```bash
+sudo apt-get install -y nmap supervisor
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+supervisord -c supervisord.conf
+```
 
 ## Configuration
 
-All settings are managed via environment variables and `.env` file. See `app/config.py` for available options:
+Environment variables in `.env`:
 
-- RabbitMQ connection
-- Redis connection
-- ScanLedger backend URL/token
-- Nmap scan options
+- RabbitMQ connection (where tasks come from)
+- Redis connection (task tracking and locking)
+- ScanLedger URL and token (where results are sent)
 - Logging level
 
-## Usage
+See `app/config.py` for all options.
 
-Worker runs as a persistent background service, processing tasks in real-time. It connects to ScanLedger and Tasker via configured endpoints. Main entrypoint is managed by Supervisor or Docker.
+## How it works
 
-### Task Queues
+Worker uses Celery with RabbitMQ for task consumption. Internally:
 
-- **nmap_scan_queue**: Receives scan tasks
-- **nmap_cancel_queue**: Receives cancel requests
-- **worker_service_broadcast**: Receives broadcast tasks (e.g., IP update)
+- **nmap_scan_queue** — receives scan tasks
+- **nmap_cancel_queue** — receives cancel requests
+- **worker_service_broadcast** — receives broadcast messages (IP registration)
 
-### Main Tasks
+Running tasks and process IDs are tracked in Redis. On completion or cancellation, state is cleaned up and results are uploaded to ScanLedger.
 
-- `scan_task`: Runs Nmap scan, tracks in Redis, uploads results
-- `cancel_task`: Cancels running scan by task ID
-- `update_worker_ip_task`: Registers worker IP in Redis
+## Documentation
 
-## Development
+Full documentation: [https://falcoria.github.io/falcoria-docs/](https://falcoria.github.io/falcoria-docs/)
 
-- Code is organized under `app/` and `app/runtime/`
-- Extend tasks in `app/tasks.py`
-- Add scan logic in `app/runtime/nmap_runner.py`
-- Redis wrappers in `app/runtime/redis_wrappers.py`
-- Logging via `app/logger.py`
+- [Architecture](https://falcoria.github.io/falcoria-docs/architecture/) — how Workers fit into the system
+- [Distribution](https://falcoria.github.io/falcoria-docs/concepts/distribution/) — distributed scanning model
+- [Scan Configs](https://falcoria.github.io/falcoria-docs/concepts/scan-configs/) — two-phase scanning and config structure
 
 ## License
 
